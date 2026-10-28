@@ -1,0 +1,688 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2b2b2b">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-v1-192.png">
+<title>Скрипт ролика</title>
+<style>
+  :root { --bg:#2b2b2b; --card:#363636; --text:#fff; --head:#6cc4ff; --border:#bdbdbd; --ok:#3f8f5a; --no:#a04848; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family:system-ui,sans-serif;
+         height:100dvh; overflow:hidden; display:flex; flex-direction:column; padding:16px; padding-bottom:calc(16px + env(safe-area-inset-bottom)); }
+  h1 { color:var(--head); font-size:1.1rem; margin:0 0 4px; }
+  #stats { font-size:.9rem; opacity:.8; margin-bottom:12px; }
+  #stage { flex:1; min-height:0; display:flex; flex-direction:column; justify-content:center; max-width:480px; width:100%; margin:0 auto; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:16px; flex:1; min-height:0; overflow:auto;
+          display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:12px; cursor:pointer; user-select:none; }
+  .pic { font-size:5rem; line-height:1.1; } .pic img { max-width:100%; max-height:22dvh; object-fit:contain; border-radius:12px; }
+  .listen { font-size:4.5rem; line-height:1.1; }
+  .ru { font-size:1.35rem; margin-top:10px; }
+  .en { font-size:1.4rem; margin-top:10px; color:var(--head); }
+  .ipa { font-size:1rem; margin-top:4px; color:var(--border); }
+  .snd { display:flex; gap:8px; margin-top:10px; }
+  .en b { color:#fff; font-weight:800; } .en span { opacity:.6; font-weight:400; }
+  .rhythm { font-size:.75rem; opacity:.55; margin-top:6px; }
+  .en.long { font-size:1.05rem; line-height:1.45; }
+  .cue { font-size:1.05rem; opacity:.75; margin-bottom:6px; }
+  .fadetext { font-size:1.25rem; line-height:1.5; margin-top:8px; }
+  .fadetext i { font-style:normal; opacity:.45; letter-spacing:1px; }
+  .lvl { font-size:.8rem; opacity:.7; margin-top:8px; }
+  .row2 { flex:none; display:flex; gap:8px; margin-top:8px; }
+  .row2 button { padding:12px 8px; font-size:.9rem; }
+  button:disabled { opacity:.35; }
+  .tip { font-size:.95rem; margin-top:8px; color:#ffd58a; }
+  .ctx { font-size:.9rem; margin-top:8px; opacity:.75; font-style:italic; }
+  .habit { display:flex; align-items:center; gap:8px; font-size:.85rem; margin:2px 0 8px; cursor:pointer; user-select:none; }
+  .meter { flex:1; height:6px; background:var(--card); border:1px solid var(--border); border-radius:4px; overflow:hidden; }
+  .meter i { display:block; height:100%; width:0; background:var(--head); transition:width .3s; }
+  .meter.done i { background:var(--ok); }
+  .w { font-weight:700; color:#fff; } .f { opacity:.6; font-weight:400; }
+  .m { color:#ffd58a; text-decoration:underline; text-underline-offset:4px; text-decoration-thickness:2px; }
+  .pz { color:var(--border); opacity:.8; margin:0 .3em; font-weight:400; } .ar { color:var(--head); font-size:.8em; margin:0 .2em; vertical-align:super; }
+  .legend { font-size:.72rem; opacity:.6; margin-top:10px; font-weight:400; color:var(--text); line-height:1.4; }
+  #player { position:fixed; inset:0; z-index:11; background:var(--bg); overflow:auto; padding:16px; padding-bottom:calc(16px + env(safe-area-inset-bottom)); display:none; }
+  #player.open { display:block; } #player .wrap { max-width:480px; margin:0 auto; }
+  #player .card { flex:none; min-height:150px; cursor:default; margin-top:4px; }
+  #player .row button { padding:14px 4px; font-size:1.05rem; } #player .row .ok { flex:1.4; font-size:1.3rem; }
+  #player input[type=range] { width:100%; margin:14px 0 2px; accent-color:var(--head); }
+  #player select { flex:1; min-width:0; }
+  .hint { opacity:.6; font-size:.85rem; margin-top:8px; }
+  .row { flex:none; display:flex; gap:10px; margin-top:12px; }
+  button { flex:1; padding:16px; font-size:1.05rem; color:#fff; background:var(--card); border:1px solid var(--border); border-radius:12px; }
+  button.ok { background:var(--ok); } button.no { background:var(--no); }
+  button.on { border-color:var(--head); color:var(--head); }
+  .small { flex:0; padding:10px 14px; font-size:.85rem; white-space:nowrap; }
+  .back { flex:0; padding:16px 22px; }
+  .done { text-align:center; } .done h2 { color:var(--head); }
+  .top { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+  .bar { display:flex; gap:8px; margin-bottom:8px; }
+  select { flex:1; min-width:0; padding:10px; font-size:.9rem; color:#fff; background:var(--card); border:1px solid var(--border); border-radius:12px; }
+  .nav { flex:none; display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+  .nav button { flex:none; padding:8px 22px; font-size:1.2rem; } .nav button.small { padding:10px 14px; font-size:.85rem; } .nav span { opacity:.8; }
+  #list { position:fixed; inset:0; z-index:10; background:var(--bg); overflow:auto; padding:16px; display:none; }
+  #list.open { display:block; } #list .wrap { max-width:480px; margin:0 auto; }
+  .item { display:flex; gap:12px; align-items:center; padding:10px; margin-bottom:8px; background:var(--card);
+          border:1px solid var(--border); border-radius:12px; cursor:pointer; }
+  .item .th { width:48px; text-align:center; font-size:2rem; } .item img { width:48px; height:48px; object-fit:cover; border-radius:8px; vertical-align:middle; }
+  .item .t { flex:1; } .item small { display:block; opacity:.7; margin-top:2px; }
+  footer { flex:none; max-width:480px; width:100%; margin:12px auto 0; display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
+</style>
+</head>
+<body>
+<div class="top"><h1>Скрипт ролика</h1><div style="display:flex;gap:6px"><button class="small" id="open-player" title="Плеер: повтори за диктором, дрил голосом">🎧</button><button class="small" id="voice" title="Голос озвучки">🔊 UK</button><button class="small" id="open-list">Список</button></div></div>
+<div class="bar">
+  <select id="deck" aria-label="Колода"></select>
+  <button class="small" id="m-cards">Карточки</button>
+  <button class="small" id="m-drill">Дрил</button>
+  <button class="small" id="m-fade">Тает</button>
+</div>
+<div class="habit" id="habit" title="Нажмите, чтобы сменить дневную цель"><span id="streak"></span><div class="meter" id="meter"><i id="fill"></i></div><span id="today"></span></div>
+<div id="stats"></div>
+<div id="stage"></div>
+<footer>
+  <button class="small" id="save">Сохранить прогресс</button>
+  <button class="small" id="load">Загрузить прогресс</button>
+  <input type="file" id="file" accept=".json" hidden>
+</footer>
+<div id="player"><div class="wrap">
+  <div class="top"><h1 id="ptitle">Плеер</h1><button class="small" id="pclose">Закрыть</button></div>
+  <div class="bar"><select id="pkind" aria-label="Тренировка"></select><button class="small" id="pvoice">🔊 UK</button></div>
+  <div class="card" id="pcard"><div class="cue" id="pnum"></div><div class="ru" id="pru"></div><div class="en" id="pen"></div></div>
+  <input type="range" id="pseek" min="0" max="1000" value="0" aria-label="Положение">
+  <div class="lvl" id="ptime" style="text-align:center;margin:0 0 10px">0:00 / 0:00</div>
+  <div class="row"><button id="pback">⏪ 10</button><button id="pprev">⏮</button><button class="ok" id="pplay">▶</button><button id="pnext">⏭</button><button id="pfwd">10 ⏩</button></div>
+  <div class="row2" style="margin-top:12px"><select id="pspeed" aria-label="Скорость"><option value="0.7">0,7×</option><option value="0.8">0,8×</option><option value="0.9">0,9×</option><option value="1">1×</option><option value="1.1">1,1×</option><option value="1.25">1,25×</option></select>
+    <select id="psleep" aria-label="Таймер сна"><option value="0">Без таймера</option><option value="15">Стоп через 15 мин</option><option value="30">Стоп через 30 мин</option><option value="60">Стоп через 60 мин</option></select>
+    <button id="ptext">👁 Текст</button></div>
+  <div class="hint" id="pstatus" style="text-align:center"></div>
+</div></div>
+<div id="list"><div class="wrap"><div class="top"><h1>Все карточки</h1><button class="small" id="close-list">Закрыть</button></div><div id="items"></div></div></div>
+<script src="cards.js"></script>
+<script>
+const KEY = "cards-progress-v1";   // прогресс интервального повторения: ключ ОБЩИЙ с приложением «Карточки English» (один адрес сайта, одна память браузера)
+const PREF = "script-prefs-v1";    // выбранная колода и режим (свои, не общие с «Карточки English»)
+const DAY = 86400000;
+const INTERVALS = [0, 1, 3, 7, 14, 30]; // дни по коробкам 0..5
+
+function loadJson(key) { try { return JSON.parse(localStorage.getItem(key)) || {}; } catch { return {}; } }
+function saveJson(key, v) { try { localStorage.setItem(key, JSON.stringify(v)); } catch {} }
+const $ = s => document.querySelector(s);
+let state = loadJson(KEY);   // { ключ карточки: { box, due } }
+const prefs = loadJson(PREF);
+function savePrefs() { saveJson(PREF, { deck: D.id, mode, level, voice }); }
+
+// ---------- Привычка: серия дней и дневная цель ----------
+// Время занятий считаем по нажатиям: пауза дольше 45 с не засчитывается, одиночное нажатие даёт 5 с.
+// День засчитан, когда набрана дневная цель (2, 3, 5 или 10 минут). Серия — дни подряд; сегодняшний день ещё идёт и серию не рвёт.
+const HABIT = "cards-habit-v1";   // серия дней общая с «Карточки English»: время в обоих приложениях идёт в одну цель
+let habit = loadJson(HABIT);   // { goal: минуты, days: { "2026-10-27": секунды } }
+function fixHabit() { habit.goal = [2, 3, 5, 10].includes(habit.goal) ? habit.goal : 3; habit.days = habit.days || {}; }
+fixHabit();
+
+function dayKey(back = 0) {
+  const d = new Date(Date.now()); d.setDate(d.getDate() - back);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function streakCount() {
+  const goal = habit.goal * 60;
+  let n = 0, back = (habit.days[dayKey()] || 0) >= goal ? 0 : 1;   // сегодня ещё не набрано — считаем со вчера
+  while ((habit.days[dayKey(back)] || 0) >= goal) { n++; back++; }
+  return n;
+}
+const mmss = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+
+function habitRender() {
+  const sec = habit.days[dayKey()] || 0, goal = habit.goal * 60, n = streakCount();
+  $("#streak").textContent = `🔥 ${n} ${n % 10 === 1 && n % 100 !== 11 ? "день" : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? "дня" : "дней"}`;
+  $("#fill").style.width = Math.min(100, sec / goal * 100) + "%";
+  $("#meter").classList.toggle("done", sec >= goal);
+  $("#today").textContent = sec >= goal ? `✓ ${habit.goal} мин` : `${mmss(sec)} / ${habit.goal}:00`;
+}
+
+let lastTap = 0;
+document.addEventListener("click", () => {
+  const now = Date.now(), gap = now - lastTap, k = dayKey();
+  habit.days[k] = (habit.days[k] || 0) + (lastTap && gap <= 45000 ? gap / 1000 : 5);
+  lastTap = now;
+  saveJson(HABIT, habit); habitRender();
+}, true);
+$("#habit").onclick = () => { const g = [2, 3, 5, 10]; habit.goal = g[(g.indexOf(habit.goal) + 1) % g.length]; saveJson(HABIT, habit); habitRender(); };
+
+const stage = $("#stage");
+let D = DECKS.find(d => d.id === prefs.deck) || DECKS[0];   // текущая колода
+let mode = ["cards", "drill", "fade"].includes(prefs.mode) ? prefs.mode : "fade";   // для скрипта по умолчанию «Тает»
+let voice = prefs.voice === "us" ? "us" : "uk";   // голос озвучки: uk — британский (Johnny Kid), us — американский (Jon Catalyst)
+let level = Math.min(4, Math.max(0, +prefs.level || 0));   // «Тает»: 0 — весь текст … 4 — только подсказка
+let current = null, flipped = false;
+
+// У первой колоды ключи прогресса остались прежними (просто номер), у остальных — «колода:номер»
+const k = c => D.id === "core" ? String(c.id) : `${D.id}:${c.id}`;
+const imgSrc = c => `img/${D.dir}${c.id}.jpg`;
+const thumb = c => D.noimg ? c.emoji : `<img src="${imgSrc(c)}" alt="" onerror="this.replaceWith(document.createTextNode('${c.emoji}'))">`;
+const picHtml = c => D.noimg ? `<div class="pic" style="font-size:2.2rem">${c.emoji}</div>` : `<div class="pic">${thumb(c)}</div>`;
+
+// ---------- Режим «Карточки» (интервальное повторение) ----------
+
+function dueCards() {
+  const now = Date.now();
+  return D.cards.filter(c => !state[k(c)] || state[k(c)].due <= now)
+                .sort((a, b) => ((state[k(a)]?.due ?? 0) - (state[k(b)]?.due ?? 0)) || (a.id - b.id));
+}
+
+function stats() {
+  const learned = D.cards.filter(c => (state[k(c)]?.box ?? 0) >= 3).length;
+  $("#stats").textContent = `На сегодня: ${dueCards().length} · Выучено: ${learned} из ${D.cards.length}`;
+}
+
+// Практика сверх расписания: «Повторить всё» или «10 самых слабых». Расписание (интервалы) при этом не меняется.
+let practice = null;   // { order: [карточки], pos }
+
+function startPractice(kind) {
+  const rank = c => state[k(c)]?.box ?? -1;   // -1 — карточка ещё не пройдена
+  const pool = kind === "weak" ? D.cards.slice().sort((a, b) => rank(a) - rank(b) || a.id - b.id).slice(0, 10) : D.cards;
+  practice = { order: shuffle(pool), pos: 0 };
+  next();
+}
+
+function next() {
+  stats();
+  if (practice && practice.pos < practice.order.length) {
+    $("#stats").textContent = `Практика · расписание не меняется`;
+    current = practice.order[practice.pos];
+    flipped = false;
+    render();
+    return;
+  }
+  practice = null;
+  const due = dueCards();
+  if (!due.length) {
+    current = null;
+    stage.innerHTML = `<div class="done"><h2>На сегодня всё 🎉</h2><p>Новые повторения по расписанию будут позже, но заниматься можно сколько угодно.</p>
+      <div class="row" style="flex-direction:column"><button id="pall">🔁 Повторить всё вразнобой</button><button id="pweak">🎯 10 самых слабых</button></div>
+      <p class="hint">Расписание при этом не сбивается.</p></div>`;
+    $("#pall").onclick = () => startPractice("all");
+    $("#pweak").onclick = () => startPractice("weak");
+    return;
+  }
+  // не показывать одну и ту же карточку подряд, если есть другие
+  current = due.find(c => c !== current) || due[0];
+  flipped = false;
+  render();
+}
+
+function render() {
+  const c = current;
+  if (!flipped) {
+    stage.innerHTML = navHtml() + `<div class="card" id="card">${picHtml(c)}<div class="ru">${c.ru}</div>
+      <div class="hint">Вспомните вслух, потом нажмите на карточку</div></div>`;
+    $("#card").onclick = () => { flipped = true; render(); play(c, false); };
+  } else {
+    stage.innerHTML = navHtml() + `<div class="card" id="card">${picHtml(c)}<div class="ru">${c.ru}</div>
+      <div class="en${c.en.length > 90 ? " long" : ""}">${stressHtml(c)}</div>${c.ipa ? `<div class="ipa">${c.ipa}</div>${c.en.includes(" ") ? `<div class="rhythm">Жирным — ударные слова, на них держится ритм</div>` : ""}${extraHtml(c)}` : ""}
+      <div class="snd"><button class="small" id="p1">🔊 Обычно</button><button class="small" id="p2">🐢 Медленно</button></div></div>
+      <div class="row"><button class="no" id="no">Не знал</button><button class="ok" id="ok">Знал</button></div>`;
+    $("#card").onclick = () => play(c, false);
+    $("#p1").onclick = e => { e.stopPropagation(); play(c, false); };
+    $("#p2").onclick = e => { e.stopPropagation(); play(c, true); };
+    $("#ok").onclick = () => answer(true);
+    $("#no").onclick = () => answer(false);
+  }
+  $("#prev").onclick = () => go(-1);
+  $("#next").onclick = () => go(1);
+}
+
+// ---------- Разметка для чтения вслух (поле mk у карточек скрипта) ----------
+// В mk: *слово* — главное слово фразы, «/» короткая пауза, «//» длинная, «↗» «↘» — интонация.
+// Смысловые слова (жирные) определяются автоматически: всё, кроме служебных слов из списка STOP.
+const STOP = new Set(("a an the to of in on at by for with from into as and or but if so than that this these those it its i me my you your we our us he him his she her they them their is are was were be been being am do does did have has had will would should can could may might must there").split(" "));
+
+function markTokens(mk) {
+  return mk.split(" ").map(t => {
+    if (t === "/" || t === "//") return { pause: t.length };
+    if (t === "↗" || t === "↘") return { arrow: t };
+    const m = t.match(/^([^*A-Za-z0-9]*)(\*)?([A-Za-z0-9][A-Za-z0-9'’\-]*)(\*)?(.*)$/);
+    if (!m) return { raw: t };
+    const core = m[3];
+    return { pre: m[1], core, post: m[5], main: !!(m[2] || m[4]), fn: STOP.has(core.toLowerCase()) };
+  });
+}
+
+// lv — уровень «Тает» (0 весь текст … 3 первые буквы), legend — подпись с расшифровкой знаков
+function markHtml(c, lv = 0, legend = false) {
+  let i = 0;
+  const out = markTokens(c.mk).map(t => {
+    if (t.pause) return `<span class="pz">${t.pause > 1 ? "║" : "│"}</span>`;
+    if (t.arrow) return `<span class="ar">${t.arrow}</span>`;
+    if (t.raw !== undefined) return t.raw;
+    const n = i++;
+    let hide = (lv === 1 && n % 3 === 2) || (lv === 2 && n % 2 === 1) || lv === 3;
+    let word;
+    if (hide) word = `<i>${lv === 3 ? t.core[0] + "_".repeat(t.core.length - 1) : "_".repeat(t.core.length)}</i>`;
+    else word = `<span class="${t.main ? "w m" : t.fn ? "f" : "w"}">${t.core}</span>`;
+    return t.pre + word + t.post;
+  }).join(" ");
+  return out + (legend ? '<div class="legend">Жирное — смысловые слова, <span class="m">главное</span> — на нём голос поднимается, │ короткая пауза, ║ длинная, ↗ ↘ интонация</div>' : "");
+}
+
+// Ударные слова берём из транскрипции: слово ударное, если его IPA начинается с ˈ
+function stressHtml(c) {
+  if (c.mk) return markHtml(c, 0, true);
+  if (!c.ipa || !c.en.includes(" ")) return c.en;   // одно слово: ударение показано в транскрипции и в подсказке
+  const words = c.en.split(" "), ipa = c.ipa.replace(/[\[\]]/g, "").split(" ");
+  if (words.length !== ipa.length) return c.en;
+  return words.map((w, i) => ipa[i].startsWith("ˈ") ? `<b>${w}</b>` : `<span>${w}</span>`).join(" ");
+}
+
+// Подсказка по произношению и фраза из скрипта (есть у колоды «Трудные слова»)
+function extraHtml(c) {
+  return (c.tip ? `<div class="tip">${c.tip}</div>` : "") + (c.ctx ? `<div class="ctx">«…${c.ctx}…»</div>` : "");
+}
+
+function navHtml() {
+  const label = practice ? `${practice.pos + 1} / ${practice.order.length} · практика` : `${D.cards.indexOf(current) + 1} / ${D.cards.length}`;
+  return `<div class="nav"><button id="prev">←</button><span>${label}</span><button id="next">→</button></div>`;
+}
+
+function go(d) {
+  if (practice) {
+    const n = practice.order.length;
+    practice.pos = (practice.pos + d + n) % n;
+    current = practice.order[practice.pos]; flipped = false; render();
+    return;
+  }
+  const i = D.cards.indexOf(current);
+  current = D.cards[(i + d + D.cards.length) % D.cards.length];
+  flipped = false;
+  render();
+}
+
+function answer(known) {
+  if (practice) { practice.pos++; next(); return; }   // в практике расписание не трогаем
+  const s = state[k(current)] || { box: 0, due: 0 };
+  s.box = known ? Math.min(s.box + 1, INTERVALS.length - 1) : 0;
+  // «не знал» вернётся в этой же сессии: due = сейчас, но не подряд
+  s.due = known ? Date.now() + INTERVALS[s.box] * DAY : Date.now();
+  state[k(current)] = s;
+  saveJson(KEY, state);
+  next();
+}
+
+// ---------- Режим «Дрил»: слушаю команду, делаю действие, проверяю себя ----------
+// Этап 1 «Цепочка» — фразы по порядку урока. Этап 2 «Вразнобой» — тот же набор вперемешку.
+// Прогресс интервального повторения в дриле не меняется.
+
+const drill = { stage: "chain", order: [], pos: 0, shown: false, finished: false };
+
+function shuffle(a) {
+  a = a.slice();
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+
+function drillStart(st, pos = 0, autoplay = false) {   // звук сам не включается: только после «Дальше»
+  drill.stage = st; drill.pos = pos; drill.shown = false; drill.finished = false;
+  drill.order = st === "chain" ? D.cards.slice() : shuffle(D.cards);
+  drillRender(autoplay);
+}
+
+function drillNext() {
+  drill.pos++; drill.shown = false;
+  if (drill.pos >= drill.order.length) {
+    if (drill.stage === "chain") { drill.finished = true; drill.pos = drill.order.length - 1; drillRender(false); return; }
+    // новый круг вразнобой: первая карточка не должна совпасть с последней предыдущего круга
+    const last = drill.order[drill.order.length - 1];
+    const o = shuffle(D.cards);
+    if (o.length > 1 && o[0] === last) o.push(o.shift());
+    drill.order = o; drill.pos = 0;
+  }
+  drillRender(true);
+}
+
+function drillRender(autoplay) {
+  const chain = drill.stage === "chain";
+  $("#stats").textContent = `Дрил · ${chain ? "цепочка" : "вразнобой"}`;
+  if (drill.finished) {
+    stage.innerHTML = `<div class="done"><h2>Цепочка пройдена 🎉</h2><p>Теперь разорвите её: те же фразы вперемешку.</p>
+      <div class="row"><button id="again">Ещё раз по цепочке</button><button class="ok" id="rand">Вразнобой</button></div></div>`;
+    $("#again").onclick = () => drillStart("chain");
+    $("#rand").onclick = () => drillStart("random");
+    return;
+  }
+  const c = drill.order[drill.pos];
+  const label = chain ? `Цепочка · ${drill.pos + 1} / ${drill.order.length}` : `Вразнобой · ${drill.pos + 1} / ${drill.order.length}`;
+  const head = `<div class="nav"><span>${label}</span><button class="small" id="dswitch">${chain ? "Вразнобой →" : "← Цепочка"}</button></div>`;
+  if (!drill.shown) {
+    stage.innerHTML = head + `<div class="card" id="card"><div class="listen">🎧</div>
+      <div class="ru">Слушайте и выполняйте действие</div>
+      <div class="hint">Нажмите «Послушать». Сделайте действие, потом «Показать фразу»</div>
+      <div class="snd"><button class="small" id="p1">🔊 Послушать</button><button class="small" id="p2">🐢 Медленно</button></div></div>
+      <div class="row"><button class="ok" id="show">Показать фразу</button></div>`;
+    $("#card").onclick = () => play(c, false);
+    $("#show").onclick = () => { drill.shown = true; drillRender(false); };
+  } else {
+    stage.innerHTML = head + `<div class="card" id="card">${picHtml(c)}<div class="ru">${c.ru}</div>
+      <div class="en${c.en.length > 90 ? " long" : ""}">${stressHtml(c)}</div>${c.ipa ? `<div class="ipa">${c.ipa}</div>${extraHtml(c)}` : ""}
+      <div class="snd"><button class="small" id="p1">🔊 Обычно</button><button class="small" id="p2">🐢 Медленно</button></div></div>
+      <div class="row">${chain && drill.pos > 0 ? '<button class="back" id="dprev">←</button>' : ""}<button class="ok" id="dnext">Дальше →</button></div>`;
+    $("#card").onclick = () => play(c, false);
+    $("#dnext").onclick = drillNext;
+    if ($("#dprev")) $("#dprev").onclick = () => { drill.pos--; drill.shown = false; drillRender(true); };
+  }
+  $("#p1").onclick = e => { e.stopPropagation(); play(c, false); };
+  $("#p2").onclick = e => { e.stopPropagation(); play(c, true); };
+  $("#dswitch").onclick = () => drillStart(chain ? "random" : "chain");
+  if (autoplay) play(c, false);
+}
+
+// ---------- Режим «Тает»: текст кусками по порядку, слова постепенно скрываются ----------
+// Уровни: 0 весь текст · 1 нет каждого 3-го слова · 2 нет каждого 2-го · 3 только первые буквы · 4 только подсказка по-русски.
+// На новом куске уровень сбрасывается на 0.
+
+const LEVELS = ["весь текст", "скрыто каждое 3-е слово", "скрыто каждое 2-е слово", "только первые буквы", "только подсказка"];
+const fade = { pos: 0, peek: false };
+
+function maskText(text, lv) {
+  if (lv === 0) return text;
+  if (lv === 4) return "";
+  let i = 0;
+  return text.replace(/[A-Za-z0-9][A-Za-z0-9'’\-]*/g, w => {
+    const n = i++;
+    if (lv === 1 && n % 3 !== 2) return w;
+    if (lv === 2 && n % 2 !== 1) return w;
+    return lv === 3 ? `<i>${w[0]}${"_".repeat(w.length - 1)}</i>` : `<i>${"_".repeat(w.length)}</i>`;
+  });
+}
+
+// Каждый новый кусок начинается с уровня 0 (весь текст); дальше скрываете сами
+function fadeStart(pos) { fade.pos = pos; fade.peek = false; level = 0; savePrefs(); fadeRender(); }
+
+function fadeRender() {
+  const c = D.cards[fade.pos];
+  const shown = fade.peek ? 0 : level;
+  $("#stats").textContent = `Тает · ${LEVELS[level]}`;
+  const text = shown === 4 ? "" : c.mk ? markHtml(c, shown, shown === 0) : maskText(c.en, shown);
+  stage.innerHTML = `<div class="nav"><button id="fprev">←</button><span>${fade.pos + 1} / ${D.cards.length}</span><button id="fnext">→</button></div>
+    <div class="card" id="card"><div class="cue">${c.ru}</div>
+      <div class="fadetext">${text || '<span style="opacity:.5">Скажите вслух по памяти</span>'}</div>
+      <div class="lvl">Уровень ${level} из 4${fade.peek ? " · подсмотрели" : ""}</div></div>
+    <div class="row2"><button id="lless"${level === 0 ? " disabled" : ""}>← Подсказка</button><button id="lmore"${level === 4 ? " disabled" : ""}>Скрыть ещё →</button></div>
+    <div class="row2"><button id="p1">🔊 Послушать</button><button id="p2">🐢 Медленно</button><button id="peek">👁 Подсмотреть</button></div>
+    <div class="row"><button class="ok" id="fdone">Дальше →</button></div>`;
+  $("#card").onclick = () => { fade.peek = !fade.peek; fadeRender(); };
+  $("#fprev").onclick = () => fadeStart((fade.pos - 1 + D.cards.length) % D.cards.length);
+  $("#fnext").onclick = $("#fdone").onclick = () => fadeStart((fade.pos + 1) % D.cards.length);
+  $("#lless").onclick = () => { level--; savePrefs(); fade.peek = false; fadeRender(); };
+  $("#lmore").onclick = () => { level++; savePrefs(); fade.peek = false; fadeRender(); };
+  $("#peek").onclick = () => { fade.peek = !fade.peek; fadeRender(); };
+  $("#p1").onclick = () => play(c, false);
+  $("#p2").onclick = () => play(c, true);
+}
+
+// ---------- Плеер: «Повтори за диктором» и «Дрил голосом» ----------
+// Берёт готовые длинные файлы из sessions/ (их собирает tools/build_sessions.py): паузы записаны внутри файла, поэтому при выключенном экране
+// они не «плывут». Расписание фраз (id карточки, начало, конец) лежит в sessions.json: от него кнопки «⏮ ⏭» и показ текста.
+const PL = "script-player-v1";
+const pstore = loadJson(PL);   // { kind, speed, texts: { shadow, drill }, pos: { id тренировки: секунды } }
+pstore.pos = pstore.pos || {};
+const KINDS = { "shadow-chain": "Повтори за диктором", "drill-chain": "Дрил голосом: по порядку", "drill-random": "Дрил голосом: вразнобой" };
+const pl = { all: null, s: null, audio: null, idx: -1, sleepAt: 0, tick: 0, saved: 0, token: 0 };
+const skey = s => `${s.kind}-${s.order}`;
+const plSave = () => saveJson(PL, pstore);
+
+async function plSessions() {
+  if (pl.all) return pl.all;
+  try { pl.all = (await (await fetch("sessions.json")).json()).sessions; } catch { pl.all = []; }
+  return pl.all;
+}
+const plMine = () => (pl.all || []).filter(s => s.deck === D.id && s.voice === voice);
+const plPick = (key = pstore.kind) => { const m = plMine(); return m.find(s => skey(s) === key) || m[0] || null; };
+
+function plKinds() {
+  const m = plMine();
+  $("#pkind").innerHTML = m.map(s => `<option value="${skey(s)}">${KINDS[skey(s)] || skey(s)}</option>`).join("");
+  const cur = plPick();
+  if (cur) $("#pkind").value = skey(cur);
+}
+
+async function plOpen() {
+  $("#player").classList.add("open");
+  $("#pvoice").textContent = "🔊 " + voice.toUpperCase();
+  $("#pstatus").textContent = "Загружаю список…";
+  await plSessions();
+  plKinds();
+  const s = plPick();
+  if (!s) { $("#ptitle").textContent = D.name; $("#pstatus").textContent = "Для этой колоды тренировок пока нет. Выберите другую колоду."; $("#pnum").textContent = ""; $("#pru").textContent = ""; $("#pen").innerHTML = ""; return; }
+  plLoad(s);
+}
+
+function plStop() {
+  pl.token++;
+  const a = pl.audio;
+  if (a) { try { a.pause(); if (pl.s) { pstore.pos[pl.s.id] = a.currentTime || 0; plSave(); } } catch {} }
+  pl.audio = null; pl.tick = 0; pl.idx = -1; pl.sleepAt = 0;
+}
+
+async function plLoad(s) {
+  plStop();
+  const token = pl.token;
+  pl.s = s;
+  $("#ptitle").textContent = `${DECKS.find(d => d.id === s.deck).name} · ${voice.toUpperCase()}`;
+  $("#pplay").textContent = "▶";
+  $("#pstatus").textContent = `Загружаю ${(s.bytes / 1e6).toFixed(1)} МБ (один раз, потом работает без интернета)…`;
+  let blob;
+  try {
+    const ac = new AbortController(), t = setTimeout(() => ac.abort(), 90000);
+    const r = await fetch(s.file, { signal: ac.signal });
+    clearTimeout(t);
+    if (!r.ok) throw 0;
+    blob = await r.blob();
+  } catch {
+    if (token === pl.token) $("#pstatus").textContent = "Не удалось загрузить. Подключитесь к интернету один раз: дальше файл сохранится в телефоне.";
+    return;
+  }
+  if (token !== pl.token) return;   // пока грузили, выбрали другое
+  const a = new Audio(URL.createObjectURL(blob));
+  a.preservesPitch = true;
+  a.playbackRate = +pstore.speed || 1;
+  a.ontimeupdate = plTick;
+  a.onplay = () => { pl.tick = 0; $("#pplay").textContent = "⏸"; };
+  a.onpause = () => { pl.tick = 0; $("#pplay").textContent = "▶"; if (pl.s) { pstore.pos[pl.s.id] = a.currentTime || 0; plSave(); } };
+  a.onended = () => { pstore.pos[s.id] = 0; plSave(); a.currentTime = 0; $("#pplay").textContent = "▶"; };
+  a.onloadedmetadata = () => { const p = pstore.pos[s.id]; if (p && p < s.duration - 3) a.currentTime = p; plUpdate(); };
+  pl.audio = a;
+  $("#pspeed").value = String(+pstore.speed || 1);
+  $("#pstatus").textContent = "Нажмите ▶. Можно выключить экран: звук продолжится.";
+  plMedia(s);
+  plUpdate();
+}
+
+const plIndex = t => { const it = pl.s.items; let lo = 0, hi = it.length - 1; while (lo < hi) { const m = (lo + hi + 1) >> 1; if (it[m][1] <= t + 0.05) lo = m; else hi = m - 1; } return lo; };
+
+// Показывать ли английский текст: настройка отдельно для «Повтори за диктором» и для дрила (в дриле по умолчанию скрыт: фразу надо вспомнить самому)
+const plShowText = s => (pstore.texts || {})[s.kind] ?? s.kind !== "drill";
+
+function plShowCard() {
+  const s = pl.s, c = DECKS.find(d => d.id === s.deck).cards.find(x => x.id === s.items[pl.idx][0]);
+  const show = plShowText(s);
+  $("#pru").textContent = c.ru;
+  $("#pen").innerHTML = show ? (c.mk ? markHtml(c, 0, false) : stressHtml(c)) + (c.ipa ? `<div class="ipa">${c.ipa}</div>` : "") : '<span style="opacity:.5">текст скрыт</span>';
+  $("#ptext").textContent = show ? "👁 Текст" : "🙈 Текст";
+}
+
+function plUpdate() {
+  const a = pl.audio, s = pl.s;
+  if (!a || !s) return;
+  const t = a.currentTime || 0, dur = a.duration || s.duration;
+  const i = plIndex(t);
+  if (i !== pl.idx) { pl.idx = i; plShowCard(); }
+  $("#pnum").textContent = `${i + 1} / ${s.items.length}`;
+  $("#ptime").textContent = `${mmss(t)} / ${mmss(dur)}`;
+  if (!pl.dragging) $("#pseek").value = Math.round(t / dur * 1000);
+}
+
+function plTick() {
+  const a = pl.audio, s = pl.s;
+  if (!a || !s) return;
+  const now = Date.now();
+  if (!a.paused) {
+    // время прослушивания идёт в дневную цель («серия дней»)
+    if (pl.tick) { const k = dayKey(); habit.days[k] = (habit.days[k] || 0) + Math.min(1, (now - pl.tick) / 1000); }
+    pl.tick = now;
+    if (now - pl.saved > 5000) { pl.saved = now; saveJson(HABIT, habit); habitRender(); pstore.pos[s.id] = a.currentTime; plSave(); }
+    if (pl.sleepAt && now >= pl.sleepAt) { a.pause(); pl.sleepAt = 0; $("#psleep").value = "0"; }
+  }
+  plUpdate();
+}
+
+function plStep(d) {
+  const a = pl.audio, s = pl.s; if (!a || !s) return;
+  const it = s.items, t = a.currentTime || 0, i = plIndex(t);
+  let target;
+  if (d < 0) target = t - it[i][1] > 1.5 ? it[i][1] : it[Math.max(0, i - 1)][1];   // «назад»: сначала к началу этой фразы
+  else target = it[Math.min(it.length - 1, i + 1)][1];
+  a.currentTime = target; plUpdate();
+}
+function plSeek(sec) { const a = pl.audio; if (!a) return; a.currentTime = Math.max(0, Math.min((a.duration || pl.s.duration) - 0.5, (a.currentTime || 0) + sec)); plUpdate(); }
+function plMedia(s) {
+  if (!("mediaSession" in navigator)) return;   // кнопки на экране блокировки и в шторке
+  try {
+    navigator.mediaSession.metadata = new MediaMetadata({ title: KINDS[skey(s)] || "Тренировка", artist: "Скрипт ролика", album: DECKS.find(d => d.id === s.deck).name, artwork: [{ src: "icon-v2-512.png", sizes: "512x512", type: "image/png" }] });
+    const h = (n, f) => { try { navigator.mediaSession.setActionHandler(n, f); } catch {} };
+    h("play", () => pl.audio && pl.audio.play()); h("pause", () => pl.audio && pl.audio.pause());
+    h("previoustrack", () => plStep(-1)); h("nexttrack", () => plStep(1));
+    h("seekbackward", () => plSeek(-10)); h("seekforward", () => plSeek(10));
+  } catch {}
+}
+
+$("#open-player").onclick = plOpen;
+$("#pclose").onclick = () => { plStop(); $("#player").classList.remove("open"); };
+$("#pplay").onclick = () => { const a = pl.audio; if (a) a.paused ? a.play() : a.pause(); };
+$("#pprev").onclick = () => plStep(-1);
+$("#pnext").onclick = () => plStep(1);
+$("#pback").onclick = () => plSeek(-10);
+$("#pfwd").onclick = () => plSeek(10);
+$("#pseek").oninput = () => { pl.dragging = true; };
+$("#pseek").onchange = () => { const a = pl.audio; pl.dragging = false; if (a) { a.currentTime = $("#pseek").value / 1000 * (a.duration || pl.s.duration); plUpdate(); } };
+$("#pspeed").onchange = () => { pstore.speed = +$("#pspeed").value; plSave(); if (pl.audio) pl.audio.playbackRate = pstore.speed; };
+$("#psleep").onchange = () => { const m = +$("#psleep").value; pl.sleepAt = m ? Date.now() + m * 60000 : 0; };
+$("#ptext").onclick = () => { if (!pl.s) return; pstore.texts = pstore.texts || {}; pstore.texts[pl.s.kind] = !plShowText(pl.s); plSave(); if (pl.audio) plShowCard(); };
+$("#pkind").onchange = () => { pstore.kind = $("#pkind").value; plSave(); const s = plPick(pstore.kind); if (s) plLoad(s); };
+$("#pvoice").onclick = () => { voice = voice === "uk" ? "us" : "uk"; savePrefs(); voiceLabel(); $("#pvoice").textContent = "🔊 " + voice.toUpperCase(); plKinds(); const s = plPick(pstore.kind); if (s) plLoad(s); };
+
+// ---------- Колоды, режимы, список ----------
+
+function updateBar() {
+  $("#deck").innerHTML = DECKS.map(d => `<option value="${d.id}">${d.name} (${d.cards.length})</option>`).join("");
+  $("#deck").value = D.id;
+  $("#m-cards").classList.toggle("on", mode === "cards");
+  $("#m-drill").classList.toggle("on", mode === "drill");
+  $("#m-fade").classList.toggle("on", mode === "fade");
+  $("#m-fade").style.display = D.fade ? "" : "none";
+}
+
+function refresh(first) {
+  practice = null;
+  if (mode === "fade" && !D.fade) mode = "cards";   // «Тает» — только для колод-скриптов
+  savePrefs();
+  updateBar();
+  if (mode === "fade") fadeStart(0);
+  else if (mode === "drill") drillStart("chain");
+  else { current = null; next(); }
+}
+
+$("#deck").onchange = e => { D = DECKS.find(d => d.id === e.target.value); refresh(); };
+$("#m-cards").onclick = () => { mode = "cards"; refresh(); };
+$("#m-drill").onclick = () => { mode = "drill"; refresh(); };
+$("#m-fade").onclick = () => { mode = "fade"; refresh(); };
+
+function openList() {
+  const now = Date.now();
+  $("#items").innerHTML = D.cards.map(c => {
+    const s = state[k(c)];
+    const status = mode !== "cards" ? "" : !s ? "новая" : s.due <= now ? "пора повторить" : `повторить через ${Math.ceil((s.due - now) / DAY)} дн.`;
+    return `<div class="item" data-id="${c.id}"><div class="th">${thumb(c)}</div>
+      <div class="t">${c.id}. ${c.ru}<small>${status}</small></div></div>`;
+  }).join("");
+  $("#list").classList.add("open");
+}
+
+function voiceLabel() { $("#voice").textContent = "🔊 " + voice.toUpperCase(); }
+$("#voice").onclick = () => { voice = voice === "uk" ? "us" : "uk"; savePrefs(); voiceLabel(); };
+$("#open-list").onclick = openList;
+$("#close-list").onclick = () => $("#list").classList.remove("open");
+$("#items").onclick = e => {
+  const it = e.target.closest(".item"); if (!it) return;
+  const c = D.cards.find(x => x.id === +it.dataset.id);
+  $("#list").classList.remove("open");
+  if (mode === "fade") { fadeStart(D.cards.indexOf(c)); return; }
+  if (mode === "drill") { drillStart("chain", D.cards.indexOf(c)); return; }
+  practice = null; current = c; flipped = false; render();
+};
+
+// ---------- Звук ----------
+
+let audio = null;
+
+// Готовая озвучка из audio/; если файла нет — голос телефона
+function play(c, slow) {
+  try { speechSynthesis.cancel(); audio && audio.pause(); } catch {}
+  const us = `audio/${D.dir}${c.id}.mp3`, uk = `audio-uk/${D.dir}${c.id}.mp3`;
+  // Из кэша ответ приходит сразу; если файла нет в кэше и сети нет, не ждём минутами (5 с), а переходим к запасному варианту
+  const get = u => {
+    const ac = new AbortController(), t = setTimeout(() => ac.abort(), 5000);
+    return fetch(u, { signal: ac.signal }).then(r => { clearTimeout(t); if (!r.ok) throw 0; return r; }, e => { clearTimeout(t); throw e; });
+  };
+  // нет файла выбранного голоса (колода ещё не озвучена им) — играет другой голос
+  (voice === "uk" ? get(uk).catch(() => get(us)) : get(us).catch(() => get(uk)))
+    .then(r => r.blob())
+    .then(b => {
+      audio = new Audio(URL.createObjectURL(b));
+      audio.preservesPitch = true;
+      audio.playbackRate = slow ? 0.75 : 1;   // «Медленно» — та же запись, замедленная без смены тона
+      return audio.play();
+    })
+    .catch(() => speak(c.en, slow));
+}
+
+function speak(text, slow) {
+  try {
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "en-US";
+    u.rate = slow ? 0.6 : 0.8;
+    speechSynthesis.speak(u);
+  } catch {}
+}
+
+// ---------- Прогресс в файл ----------
+
+$("#save").onclick = () => {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify({ v: 2, state, habit })], { type: "application/json" }));
+  a.download = "cards-progress.json";
+  a.click();
+};
+$("#load").onclick = () => $("#file").click();
+$("#file").onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const o = JSON.parse(await f.text());
+    if (o.v === 2) { state = o.state || {}; habit = o.habit || {}; fixHabit(); saveJson(HABIT, habit); }
+    else state = o;   // старый формат: только карточки
+    saveJson(KEY, state); habitRender(); refresh();
+  } catch { alert("Не удалось прочитать файл"); }
+};
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+  // при каждом запуске просим докачать то, чего не хватает в кэше (если прошлая загрузка оборвалась)
+  navigator.serviceWorker.ready.then(r => r.active && r.active.postMessage("precache")).catch(() => {});
+}
+voiceLabel();
+habitRender();
+refresh(true);
+</script>
+</body>
+</html>
