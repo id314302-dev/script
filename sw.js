@@ -2,9 +2,9 @@
 // Оболочка (index.html, cards.js, manifest) — сеть, но не дольше NET_WAIT мс, потом кэш; так новая версия подтягивается сразу, а офлайн приложение не ждёт.
 importScripts("cards.js");   // даёт список колод DECKS, из него собираем файлы для кэша
 
-const CACHE = "script-v1";   // префикс «script-»: на этом же адресе живёт ещё приложение «Карточки English» (кэши «cards-…»), чужие кэши не трогаем
+const CACHE = "script-v2";   // префикс «script-»: на этом же адресе живёт ещё приложение «Карточки English» (кэши «cards-…»), чужие кэши не трогаем
 const NET_WAIT = 2500;
-const FILES = ["./", "index.html", "cards.js", "manifest.json", "sessions.json", "icon-v1-192.png", "icon-v1-512.png",
+const FILES = ["./", "index.html", "cards.js", "manifest.json", "sessions.json", "words-uk.json", "words-us.json", "icon-v1-192.png", "icon-v1-512.png",
   ...DECKS.flatMap(d => d.cards.flatMap(c => [`audio/${d.dir}${c.id}.mp3`, `audio-uk/${d.dir}${c.id}.mp3`, ...(d.noimg ? [] : [`img/${d.dir}${c.id}.jpg`])]))];
 
 // Докачивает недостающие файлы по 6 штук параллельно; отсутствующий на сервере файл (например, нет картинки) остальное не ломает

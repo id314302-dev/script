@@ -69,10 +69,18 @@
   .item .th { width:48px; text-align:center; font-size:2rem; } .item img { width:48px; height:48px; object-fit:cover; border-radius:8px; vertical-align:middle; }
   .item .t { flex:1; } .item small { display:block; opacity:.7; margin-top:2px; }
   footer { flex:none; max-width:480px; width:100%; margin:12px auto 0; display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
+  #words { position:fixed; inset:0; z-index:12; background:var(--bg); overflow:auto; padding:16px; display:none; }
+  #words.open { display:block; } #words .wrap { max-width:480px; margin:0 auto; }
+  #wtext { font-size:1.35rem; line-height:1.9; margin:10px 0 14px; padding:12px; background:var(--card); border:1px solid var(--border); border-radius:14px; }
+  .wd { display:inline-block; padding:2px 5px; margin:1px 0; border-radius:8px; cursor:pointer; user-select:none; }
+  .wd.sel { background:rgba(108,196,255,.35); color:#fff; } .wd.anchor { outline:2px dashed var(--head); } .wd.star { border-bottom:2px solid #ffd166; }
+  .wrow { display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap; } .wrow button { flex:1; min-width:30%; }
+  .witem { display:flex; gap:8px; align-items:center; padding:10px; margin-bottom:8px; background:var(--card); border:1px solid var(--border); border-radius:12px; }
+  .witem .t { flex:1; cursor:pointer; } .witem small { display:block; opacity:.7; }
 </style>
 </head>
 <body>
-<div class="top"><h1>Скрипт ролика</h1><div style="display:flex;gap:6px"><button class="small" id="open-player" title="Плеер: повтори за диктором, дрил голосом">🎧</button><button class="small" id="voice" title="Голос озвучки">🔊 UK</button><button class="small" id="open-list">Список</button></div></div>
+<div class="top"><h1>Скрипт ролика</h1><div style="display:flex;gap:6px"><button class="small" id="open-words" title="Слова: нажми на слово, диктор повторит">🔎</button><button class="small" id="open-player" title="Плеер: повтори за диктором, дрил голосом">🎧</button><button class="small" id="voice" title="Голос озвучки">🔊 UK</button><button class="small" id="open-list">Список</button></div></div>
 <div class="bar">
   <select id="deck" aria-label="Колода"></select>
   <button class="small" id="m-cards">Карточки</button>
@@ -98,6 +106,19 @@
     <select id="psleep" aria-label="Таймер сна"><option value="0">Без таймера</option><option value="15">Стоп через 15 мин</option><option value="30">Стоп через 30 мин</option><option value="60">Стоп через 60 мин</option></select>
     <button id="ptext">👁 Текст</button></div>
   <div class="hint" id="pstatus" style="text-align:center"></div>
+</div></div>
+<div id="words"><div class="wrap">
+  <div class="top"><h1 id="wtitle">Слова</h1><button class="small" id="wclose">Закрыть</button></div>
+  <div class="wrow"><button class="small on" id="wt-card">Фраза</button><button class="small" id="wt-list">Мои слова (<span id="wcount">0</span>)</button></div>
+  <div id="wcardv">
+    <div class="nav"><button id="wprev">◀</button><span id="wnum"></span><button id="wnext">▶</button></div>
+    <div class="hint" id="wru" style="text-align:center"></div>
+    <div id="wtext"></div>
+    <div class="hint" id="wstatus" style="text-align:center;margin-bottom:8px">Нажмите на слово: диктор повторит его</div>
+    <div class="wrow"><button id="wfull">▶ Вся фраза</button><button id="wagain">🔁 Выбранное</button></div>
+    <div class="wrow"><button id="wrange">↔ Фрагмент: выкл</button><button id="wslow">🐢 Медленно: выкл</button><button id="wstar">★ В «Мои слова»</button></div>
+  </div>
+  <div id="wlistv" style="display:none"></div>
 </div></div>
 <div id="list"><div class="wrap"><div class="top"><h1>Все карточки</h1><button class="small" id="close-list">Закрыть</button></div><div id="items"></div></div></div>
 <script src="cards.js"></script>
@@ -674,6 +695,147 @@ $("#file").onchange = async e => {
     saveJson(KEY, state); habitRender(); refresh();
   } catch { alert("Не удалось прочитать файл"); }
 };
+
+
+// ---------- Слова: нажми на слово, диктор повторит его из той же записи ----------
+// Границы слов лежат в words-uk.json / words-us.json (tools/align_words.py): {колода: {номер: [[слово, начало, конец], ...]}}
+const WKEY = "script-words-v1";   // «Мои слова»: {d: колода, c: номер карточки, i: первое слово, j: последнее, t: текст}
+let wsaved = (() => { try { const a = JSON.parse(localStorage.getItem(WKEY)); return Array.isArray(a) ? a : []; } catch { return []; } })();
+const wSave = () => { try { localStorage.setItem(WKEY, JSON.stringify(wsaved)); } catch {} $("#wcount").textContent = wsaved.length; };
+const WT = {};   // тайминги по голосам
+const w = { idx: 0, sel: null, anchor: null, range: false, slow: false, tab: "card", token: 0, audio: null, timer: 0 };
+const esc = t => t.replace(/[&<>"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]));
+
+async function wTimes(v) {
+  if (WT[v]) return WT[v];
+  try { const r = await fetch(`words-${v}.json`); WT[v] = r.ok ? await r.json() : {}; } catch { WT[v] = {}; }
+  return WT[v];
+}
+const wCard = () => D.cards[w.idx];
+async function wInfo(deck, c, v = voice) {   // слова и время для выбранного голоса; нет данных — пробуем второй голос
+  for (const x of [v, v === "uk" ? "us" : "uk"]) {
+    const t = (await wTimes(x))[deck.id]?.[String(c.id)];
+    if (t) return { voice: x, t };
+  }
+  return null;
+}
+async function wBlob(deck, c, v) {
+  const urls = v === "uk" ? [`audio-uk/${deck.dir}${c.id}.mp3`, `audio/${deck.dir}${c.id}.mp3`] : [`audio/${deck.dir}${c.id}.mp3`, `audio-uk/${deck.dir}${c.id}.mp3`];
+  for (const u of urls) { try { const r = await fetch(u); if (r.ok) return URL.createObjectURL(await r.blob()); } catch {} }
+  return null;
+}
+function wStop() {
+  w.token++; clearInterval(w.timer);
+  if (w.audio) { try { w.audio.pause(); } catch {} }
+}
+// играет кусок записи от start до end (секунды); end = null — до конца
+function wPlay(deck, c, v, start, end) {
+  wStop();
+  const my = w.token;
+  return wBlob(deck, c, v).then(url => new Promise(resolve => {
+    if (!url || my !== w.token) return resolve();
+    const a = new Audio(url); w.audio = a;
+    a.preservesPitch = true; a.playbackRate = w.slow ? 0.7 : 1;
+    const done = () => { clearInterval(w.timer); try { a.pause(); } catch {} URL.revokeObjectURL(url); resolve(); };
+    a.onended = done;
+    a.onloadedmetadata = () => { a.currentTime = Math.max(0, start); a.play().catch(done); };
+    if (end != null) w.timer = setInterval(() => { if (my !== w.token) return done(); if (a.currentTime >= end) done(); }, 15);
+  }));
+}
+async function wSay(deck, c, i, j) {   // слова i..j карточки
+  const info = await wInfo(deck, c);
+  if (!info) { speak(c.en, w.slow); return; }
+  const a = info.t[i], b = info.t[j];
+  return wPlay(deck, c, info.voice, a[1] - 0.05, b[2] + 0.1);
+}
+
+function wRender() {
+  const c = wCard();
+  $("#wtitle").textContent = D.name;
+  $("#wnum").textContent = `${w.idx + 1} / ${D.cards.length}`;
+  $("#wru").textContent = c.ru;
+  const toks = c.en.split(/\s+/);
+  const starred = new Set(); wsaved.filter(x => x.d === D.id && x.c === c.id).forEach(x => { for (let k = x.i; k <= x.j; k++) starred.add(k); });
+  $("#wtext").innerHTML = toks.map((t, i) => {
+    if (!/[\w]/.test(t)) return esc(t);   // тире и знаки сами по себе не нажимаются
+    const cls = ["wd"];
+    if (w.sel && i >= w.sel[0] && i <= w.sel[1]) cls.push("sel");
+    if (w.anchor === i) cls.push("anchor");
+    if (starred.has(i)) cls.push("star");
+    return `<span class="${cls.join(" ")}" data-i="${i}">${esc(t)}</span>`;
+  }).join(" ");
+  $("#wrange").textContent = "↔ Фрагмент: " + (w.range ? "вкл" : "выкл");
+  $("#wrange").classList.toggle("on", w.range);
+  $("#wslow").textContent = "🐢 Медленно: " + (w.slow ? "вкл" : "выкл");
+  $("#wslow").classList.toggle("on", w.slow);
+  $("#wstatus").textContent = w.range ? (w.anchor == null ? "Нажмите на первое слово фрагмента" : "Теперь нажмите на последнее слово") : "Нажмите на слово: диктор повторит его";
+  $("#wcount").textContent = wsaved.length;
+}
+function wListRender() {
+  const box = $("#wlistv");
+  if (!wsaved.length) { box.innerHTML = `<div class="hint" style="text-align:center;margin-top:20px">Пока пусто. Выберите слово или фрагмент и нажмите «★ В Мои слова».</div>`; return; }
+  box.innerHTML = `<div class="wrow"><button id="wall">▶ Пройти все: слово, ваша пауза, слово</button></div>` +
+    wsaved.map((x, n) => `<div class="witem"><div class="t" data-n="${n}">${esc(x.t)}<small>${esc((DECKS.find(d => d.id === x.d) || {}).name || "")} · карточка ${x.c}</small></div><button class="small" data-del="${n}">✕</button></div>`).join("");
+  $("#wall").onclick = wRunAll;
+}
+function wTab(t) {
+  w.tab = t; wStop();
+  $("#wcardv").style.display = t === "card" ? "" : "none";
+  $("#wlistv").style.display = t === "list" ? "" : "none";
+  $("#wt-card").classList.toggle("on", t === "card"); $("#wt-list").classList.toggle("on", t === "list");
+  if (t === "card") wRender(); else wListRender();
+}
+async function wRunAll() {
+  wStop(); const my = w.token;
+  for (const x of wsaved.slice()) {
+    if (my !== w.token) return;
+    const deck = DECKS.find(d => d.id === x.d), c = deck && deck.cards.find(y => y.id === x.c); if (!c) continue;
+    await wSay(deck, c, x.i, x.j); if (my !== w.token) return;
+    await new Promise(r => setTimeout(r, 2200)); if (my !== w.token) return;   // пауза: повторите вслух
+    await wSay(deck, c, x.i, x.j);
+    await new Promise(r => setTimeout(r, 900));
+  }
+}
+
+$("#wtext").onclick = e => {
+  const el = e.target.closest(".wd"); if (!el) return;
+  const i = +el.dataset.i;
+  if (w.range) {
+    if (w.anchor == null) { w.anchor = i; w.sel = [i, i]; wRender(); return; }
+    w.sel = [Math.min(w.anchor, i), Math.max(w.anchor, i)]; w.anchor = null;
+  } else w.sel = [i, i];
+  wRender(); wSay(D, wCard(), w.sel[0], w.sel[1]);
+};
+$("#wfull").onclick = () => { w.sel = null; w.anchor = null; wRender(); wInfo(D, wCard()).then(info => info ? wPlay(D, wCard(), info.voice, 0, null) : speak(wCard().en, w.slow)); };
+$("#wagain").onclick = () => { if (w.sel) wSay(D, wCard(), w.sel[0], w.sel[1]); };
+$("#wrange").onclick = () => { w.range = !w.range; w.anchor = null; wRender(); };
+$("#wslow").onclick = () => { w.slow = !w.slow; wRender(); };
+$("#wstar").onclick = () => {
+  if (!w.sel) { $("#wstatus").textContent = "Сначала выберите слово или фрагмент"; return; }
+  const c = wCard(), [i, j] = w.sel, t = c.en.split(/\s+/).slice(i, j + 1).join(" ").replace(/^[^\w']+|[^\w']+$/g, "");
+  if (!wsaved.some(x => x.d === D.id && x.c === c.id && x.i === i && x.j === j)) wsaved.push({ d: D.id, c: c.id, i, j, t });
+  wSave(); wRender(); $("#wstatus").textContent = `Добавлено: ${t}`;
+};
+const wGo = d => { w.idx = (w.idx + d + D.cards.length) % D.cards.length; w.sel = null; w.anchor = null; wStop(); wRender(); };
+$("#wprev").onclick = () => wGo(-1);
+$("#wnext").onclick = () => wGo(1);
+$("#wt-card").onclick = () => wTab("card");
+$("#wt-list").onclick = () => wTab("list");
+$("#wlistv").onclick = e => {
+  const del = e.target.closest("[data-del]");
+  if (del) { wsaved.splice(+del.dataset.del, 1); wSave(); wListRender(); return; }
+  const it = e.target.closest(".t"); if (!it) return;
+  const x = wsaved[+it.dataset.n], deck = DECKS.find(d => d.id === x.d), c = deck && deck.cards.find(y => y.id === x.c);
+  if (c) wSay(deck, c, x.i, x.j);
+};
+$("#open-words").onclick = () => {
+  let pos = 0;
+  try { if (mode === "fade") pos = fade.pos; else if (mode === "drill") pos = Math.max(0, D.cards.indexOf(drill.order[drill.pos])); else if (current) pos = Math.max(0, D.cards.indexOf(current)); } catch {}
+  w.idx = pos || 0; w.sel = null; w.anchor = null;
+  wTimes(voice);
+  $("#words").classList.add("open"); wTab("card");
+};
+$("#wclose").onclick = () => { wStop(); $("#words").classList.remove("open"); };
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").catch(() => {});
